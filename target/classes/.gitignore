@@ -1,6 +1,5 @@
 /META-INF/
-/model/
-/mainPackage/
-/view/
-/controller/
 /util/
+/model/
+/controller/
+/view/

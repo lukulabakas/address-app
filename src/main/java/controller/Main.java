@@ -1,16 +1,25 @@
 package controller;
+import java.io.File;
 import java.io.IOException;
+import java.util.prefs.Preferences;
+
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import model.Person;
+import model.PersonListWrapper;
 
 public class Main extends Application {
 
@@ -23,6 +32,7 @@ public class Main extends Application {
     //constructor
     public Main() {
     	//sample data
+    /*
 		personData.add(new Person("Hans", "Muster"));
 		personData.add(new Person("Ruth", "Mueller"));
 		personData.add(new Person("Heinz", "Kurz"));
@@ -32,6 +42,7 @@ public class Main extends Application {
 		personData.add(new Person("Anna", "Best"));
 		personData.add(new Person("Stefan", "Meier"));
 		personData.add(new Person("Martin", "Mueller"));
+	*/
     }
     
     //return the data as an observable list of Persons
@@ -41,7 +52,6 @@ public class Main extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-    	System.out.println("test");
         this.primaryStage = primaryStage;
         this.primaryStage.setTitle("Address-App");
         
@@ -55,7 +65,6 @@ public class Main extends Application {
     
 
      //Initializes the root layout.
-
     public void initRootLayout() {
         try {
             // Load root layout from fxml file.
@@ -66,15 +75,24 @@ public class Main extends Application {
             // Show the scene containing the root layout.
             Scene scene = new Scene(rootLayout);
             primaryStage.setScene(scene);
+            
+            //give the controller access to the main app
+            RootLayoutController controller = loader.getController();
+            controller.setMainApp(this);
+            
             primaryStage.show();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+        //try to load last opened person file
+        File file = getPersonFilePath();
+        if(file != null) {
+        	loadPersonDataFromFile(file);
         }
     }
 
  
      //Shows the person overview inside the root layout.
-
     public void showPersonOverview() {
         try {
             // Load person overview.
@@ -130,6 +148,86 @@ public class Main extends Application {
     	}catch (IOException e) {
     		e.printStackTrace();
     		return false;
+    	}
+    }
+    
+    //returns the person file preference as a file
+    public File getPersonFilePath() {
+    	Preferences prefs = Preferences.userNodeForPackage(Main.class);
+    	String filePath = prefs.get("filePath", null);
+    	if(filePath != null) {
+    		return new File(filePath);
+    	}else {
+    		return null;
+    	}
+    }
+    
+    //set the file path of the currently loaded file
+    public void setPersonFilePath(File file) {
+    	Preferences prefs = Preferences.userNodeForPackage(Main.class);
+    	if(file != null) {
+    		prefs.put("filePath", file.getPath());
+    		
+    		//update stage title
+    		primaryStage.setTitle("AddressApp - " + file.getName());
+    	}else {
+    		prefs.remove("filePath");
+    		
+    		//Update stage title
+    		primaryStage.setTitle("AddressApp");
+    	}
+    }
+    
+    //loads person data from a specified file; current person data will be replaced
+    public void loadPersonDataFromFile(File file) {
+    	try {
+    		JAXBContext context = JAXBContext
+    				.newInstance(PersonListWrapper.class);
+    		Unmarshaller um = context.createUnmarshaller();
+    		
+    		//reading xml from file and unmarshalling
+    		PersonListWrapper wrapper = (PersonListWrapper) um.unmarshal(file);
+    		
+    		personData.clear();
+    		personData.addAll(wrapper.getPersons());
+    		
+    		//save the file path to the registry
+    		setPersonFilePath(file);
+    	}catch (Exception e) {
+    		Alert alert = new Alert(AlertType.ERROR);
+    		alert.setTitle("Error");
+    		alert.setHeaderText("Could not load data");
+    		alert.setContentText("Could not load data from file:\n" + file.getPath());
+    		
+    		alert.showAndWait();
+    	}
+    }
+    
+    //Saves the current person data to a specified file
+    public void savePersonDataToFile(File file) {
+    	try {
+    		JAXBContext context = JAXBContext
+    				.newInstance(PersonListWrapper.class);
+    		Marshaller m = context.createMarshaller();
+    		m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+    		
+    		//wrapping our person data
+    		PersonListWrapper wrapper = new PersonListWrapper();
+    		wrapper.setPersons(personData);
+    		
+    		//marshalling and saving XML to the file
+    		m.marshal(wrapper, file);
+    		
+    		//save the file path to the registry
+    		setPersonFilePath(file);    		
+    	}catch (Exception e) {
+    		Alert alert = new Alert(AlertType.ERROR);
+    		alert.setTitle("Error");
+    		alert.setHeaderText("Could not save data");
+    		alert.setContentText("Could not save data to file:\n" + file.getParent());
+    		e.printStackTrace();
+    		
+    		alert.showAndWait();
     	}
     }
 }
